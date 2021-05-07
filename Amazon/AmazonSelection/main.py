@@ -6,7 +6,7 @@ import config
 import requests
 from bs4 import BeautifulSoup
 from xlutils.copy import copy as xl_copy
-import  xlrd
+import xlrd
 import np
 import re
 from selenium.webdriver import Chrome
@@ -14,9 +14,10 @@ from selenium.webdriver.chrome.options import Options
 import time
 import random
 
+
 # 获取
-def checkExceltoIDs(Excelname,idSheetName):
-    exceldata = xlrd.open_workbook(Excelname,formatting_info=True)
+def checkExceltoIDs(Excelname, idSheetName):
+    exceldata = xlrd.open_workbook(Excelname, formatting_info=True)
     allSheet = exceldata._sheet_names
 
     if 'openUrlSheet' in allSheet:
@@ -29,20 +30,21 @@ def checkExceltoIDs(Excelname,idSheetName):
 
     exceldata = xlrd.open_workbook(Excelname, formatting_info=True)
     id_Sheet = exceldata.sheet_by_name(idSheetName)
-    id_Arr = id_Sheet.col_values(0,1)
+    id_Arr = id_Sheet.col_values(0, 1)
     caheid_Sheet = exceldata.sheet_by_name('caheIdSheet')
-    caheid_Arr = caheid_Sheet.col_values(0,0)
+    caheid_Arr = caheid_Sheet.col_values(0, 0)
 
     print(len(caheid_Arr))
 
-    if len(caheid_Arr)>0:
+    if len(caheid_Arr) > 0:
         caheid_num = float(caheid_Arr[0])
         index = id_Arr.index(caheid_num)
         id_Arr = np.array(id_Arr)
         id_Arr = id_Arr[index:]
 
-    #返回还未检查id数组
-    return  id_Arr
+    # 返回还未检查id数组
+    return id_Arr
+
 
 # 加载品类id bestseller 列表数据
 # def loadTheid(Excelname,categoryId):
@@ -57,7 +59,7 @@ def checkExceltoIDs(Excelname,idSheetName):
 #     responseHtml = requests.get(openUrl)
 #     return responseHtml
 
-def loadTheidbrowser(Excelname,categoryId):
+def loadTheidbrowser(Excelname, categoryId):
     exceldata = xlrd.open_workbook(Excelname, formatting_info=True)
     wb = xl_copy(exceldata)
     caheIdSheet = wb.get_sheet(3)
@@ -92,7 +94,7 @@ def loadTheidbrowser(Excelname,categoryId):
         browser.get(openUrl)
         source_code = browser.page_source
     except:
-        print("加载超时"+str(categoryId))
+        print("加载超时" + str(categoryId))
         pass
 
     browser.quit
@@ -102,24 +104,24 @@ def loadTheidbrowser(Excelname,categoryId):
         return False
 
 
-
 # 解析beastseller列表数据
 def parsingHtml(responseHtml):
     # htmlSoup =  BeautifulSoup(responseHtml.content, 'lxml')
     htmlSoup = BeautifulSoup(responseHtml, 'html.parser')
-    titles = htmlSoup.find_all('div',attrs={'class':'a-section a-spacing-none aok-relative'})
+    titles = htmlSoup.find_all('div', attrs={'class': 'a-section a-spacing-none aok-relative'})
 
-    if len(titles) <=0 :
+    if len(titles) <= 0:
         return False
 
     print('此id下共有' + str(len(titles)) + "个商品")
     i = 0
     for titleCell in titles:
         i += 1
-        if i > config.AWZ_Max_index : return False #只检查前20个商品,超出范围退出
-        if i > len(titles) - 1  : return False  # 只检查前20个商品,超出范围退出
-        print('\n'+'第'+str(i)+'商品')
+        if i > config.AWZ_Max_index: return False  # 只检查前20个商品,超出范围退出
+        if i > len(titles) - 1: return False  # 只检查前20个商品,超出范围退出
+        print('\n' + '第' + str(i) + '商品')
         _parsCell(titleCell)
+
 
 # 解析具体某个商品
 def _parsCell(titleCell):
@@ -144,10 +146,10 @@ def _parsCell(titleCell):
     pinglun = pinglun.contents[0]
     pinglun = cop.sub('', pinglun)
     print(pinglun)
-    if int(pinglun) < int(config.AWZ_CommemtMin) :
+    if int(pinglun) < int(config.AWZ_CommemtMin):
         print('评论太少')
         return
-    if int(pinglun) > int(config.AWZ_CommemtMax) :
+    if int(pinglun) > int(config.AWZ_CommemtMax):
         print('评论太多')
         return
 
@@ -165,41 +167,38 @@ def _parsCell(titleCell):
     if len(prices) > 1:
         pirceMax = prices[1].contents[0]
         pirceMax = regFloat.sub('', pirceMax)
-        pirceMax = pirceMax.replace(',','.')
+        pirceMax = pirceMax.replace(',', '.')
 
-
-    if float(priceMin) < float(config.AWZ_PriceMin) :
+    if float(priceMin) < float(config.AWZ_PriceMin):
         print('价格太低')
         return
 
-    if  float(pirceMax) > float(config.AWZ_PriceMax):
+    if float(pirceMax) > float(config.AWZ_PriceMax):
         print('价格太高')
         return
-
 
     xlsData = xlrd.open_workbook(config.AWZ_Excelname, formatting_info=True)
     wb = xl_copy(xlsData)
     sheeet = xlsData.sheet_by_name('openUrlSheet')
     inNcs = len(sheeet.col(0))
     openSheet = wb.get_sheet(2)
-    openSheet.write(inNcs,0,config.AWZ_HOST + str(linkUrl))
+    openSheet.write(inNcs, 0, config.AWZ_HOST + str(linkUrl))
     wb.save(config.AWZ_Excelname)
     print('此商品ok')
     return
 
 
-
 # 按间距中的绿色按钮以运行脚本。
 if __name__ == '__main__':
 
-    ids_arr = checkExceltoIDs(config.AWZ_Excelname,config.AWZ_IDSheet)
+    ids_arr = checkExceltoIDs(config.AWZ_Excelname, config.AWZ_IDSheet)
     index = 0
-    for idStr in  ids_arr :
-        time.sleep(random.randint(2,5))
+    for idStr in ids_arr:
+        time.sleep(random.randint(2, 5))
         # index += 1
         # if index < 5:
         responseHtml = loadTheidbrowser(config.AWZ_Excelname, idStr)
-        if responseHtml == False :
+        if responseHtml == False:
             continue
         else:
             parsingHtml(responseHtml)
@@ -211,4 +210,3 @@ if __name__ == '__main__':
     # responseHtml = loadTheidbrowser(config.AWZ_Excelname, '189731031')
     # print(responseHtml)
     # parsingHtml(responseHtml)
-
