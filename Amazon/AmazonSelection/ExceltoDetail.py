@@ -1,15 +1,21 @@
 
 from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
+from xlutils.copy import copy as xl_copy
 import re
 import datetime
 from bs4 import BeautifulSoup
 import config
+import xlrd
+import np
+import time
+import random
+import sys
 
 
 def loadDetail(detailUrl):
     options = Options()
-    options.add_argument('--headless')
+    # options.add_argument('--headless')
     options.add_argument('--disable-gpu')
     options.add_argument('disable-infobars')
     options.add_argument('--lang=zh-CN')
@@ -20,7 +26,7 @@ def loadDetail(detailUrl):
             'images': 2,  # 禁用图片的加载
         }
     }
-    options.add_experimental_option("prefs", prefs)
+    # options.add_experimental_option("prefs", prefs)
 
     # # 在linux上需要添加一下两个参数
     options.add_argument('--no-sandbox')
@@ -29,22 +35,29 @@ def loadDetail(detailUrl):
     browser = Chrome(options=options)
     browser.set_page_load_timeout(45)
     browser.set_script_timeout(45)
-
+    source_code = ''
     try:
         browser.get(detailUrl)
-        page_source = browser.page_source
-
+        source_code = browser.page_source
     except:
-        print('加载超时')
+        print("加载超时" + str(detailUrl))
         pass
 
     browser.quit
-    if page_source != None:
-        return page_source
+    if source_code != '':
+        return source_code
+    else:
+        return False
 
 
 def parsDetail(source_code):
     htmlSoup = BeautifulSoup(source_code, 'html.parser')
+
+    yanzhenArr = htmlSoup.find_all('div',attrs={'class':'a-container a-padding-double-large'})
+    if len(yanzhenArr) > 0:
+        print('遇到人机验证')
+        sys.exit(1)
+
     titles = htmlSoup.find('div',attrs={'class':'a-section',
                                         'id':'productDetails_db_sections'
                                         })
@@ -128,6 +141,79 @@ def parsDetail(source_code):
     return True
 
 
+
+def checkExceltoUrls(Excelname):
+    exceldata = xlrd.open_workbook(Excelname, formatting_info=True)
+    allSheet = exceldata._sheet_names
+
+    if 'okUrlSheet' in allSheet:
+        wb = xl_copy(exceldata)
+    else:
+        wb = xl_copy(exceldata)
+        wb.add_sheet('okUrlSheet')
+        wb.save(Excelname)
+
+    exceldata = xlrd.open_workbook(Excelname, formatting_info=True)
+    openUrlSheet = exceldata.sheet_by_name('openUrlSheet')
+    openUrlArr = openUrlSheet.col_values(0, 0)
+
+    cahetable = exceldata.sheet_by_name('caheIdSheet')
+    caheArr = cahetable.col_values(1, 0)
+    print(caheArr)
+    if len(caheArr)>0:
+        caheUrlStr = str(caheArr[0])
+        if caheUrlStr == '':return openUrlArr
+        else:
+            index = openUrlArr.index(caheUrlStr)
+            openUrlArr = np.array(openUrlArr)
+            openUrlArr = openUrlArr[index:]
+            print('当前违章'+str(index))
+            return openUrlArr
+    else:
+        print('没有换成')
+        return openUrlArr
+
+
+def writeCaheURL(Excelname,caheUrl):
+    xlsData = xlrd.open_workbook(Excelname, formatting_info=True)
+    wb = xl_copy(xlsData)
+    caheIdSheet = wb.get_sheet(3)
+    caheIdSheet.write(0, 1, caheUrl)
+    wb.save(Excelname)
+
+def writeTheURLWithOk(Excelname,caheUrl):
+    xlsData = xlrd.open_workbook(Excelname, formatting_info=True)
+    sheeet = xlsData.sheet_by_name('okUrlSheet')
+    inNcs = len(sheeet.col(0))
+
+    wb = xl_copy(xlsData)
+    okUrlSheet = wb.get_sheet(4)
+    okUrlSheet.write(inNcs, 0, str(caheUrl))
+    wb.save(Excelname)
+
 if __name__ == '__main__':
-    page_source = loadDetail('https://www.amazon.de/TSG-Downhill-MTB-Helm-Graphic-Design/dp/B0899GXFKW/ref=zg_bs_189731031_26?_encoding=UTF8&psc=1&refRID=ZJ2SZERZZ0ZR1W23ZS55')
-    print( parsDetail(page_source) )
+
+    # print('检查完成')
+    # sys.exit(1)
+    # print('检查完成')
+
+    urlArr = checkExceltoUrls(config.AWZ_Excelname)
+    for urlStr  in urlArr:
+        time.sleep(random.randint(2, 5))
+        writeCaheURL(config.AWZ_Excelname,urlStr)
+        page_source = loadDetail(urlStr)
+
+        if page_source == False:
+            continue
+        else:
+            urlISOK = parsDetail(page_source)
+            if urlISOK == True:
+                writeTheURLWithOk(config.AWZ_Excelname,urlStr)
+                print('符合')
+            else:
+                print('不符合')
+                continue
+
+
+
+    print('检查完成')
